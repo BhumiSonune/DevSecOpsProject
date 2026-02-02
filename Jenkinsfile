@@ -4,6 +4,7 @@ pipeline {
     options {
         timestamps()
         disableConcurrentBuilds()
+        ansiColor('xterm')
     }
 
     environment {
@@ -15,6 +16,7 @@ pipeline {
 
         stage('Checkout Code from GitHub') {
             steps {
+                echo "📥 Cloning source code from GitHub"
                 git branch: 'main',
                     url: 'https://github.com/Pushpak3504/Barik_Project.git'
             }
@@ -22,6 +24,7 @@ pipeline {
 
         stage('Build Backend Docker Image') {
             steps {
+                echo "🐳 Building Backend Docker Image"
                 sh '''
                   cd backend
                   docker build -t ${BACKEND_IMAGE} .
@@ -31,6 +34,7 @@ pipeline {
 
         stage('Build Frontend Docker Image') {
             steps {
+                echo "🐳 Building Frontend Docker Image"
                 sh '''
                   cd frontend
                   docker build -t ${FRONTEND_IMAGE} .
@@ -40,6 +44,7 @@ pipeline {
 
         stage('Trivy Image Security Scan') {
             steps {
+                echo "🔐 Scanning Docker images with Trivy"
                 sh '''
                   trivy image --severity HIGH,CRITICAL ${BACKEND_IMAGE} || true
                   trivy image --severity HIGH,CRITICAL ${FRONTEND_IMAGE} || true
@@ -49,9 +54,16 @@ pipeline {
 
         stage('Deploy Application (Docker Compose)') {
             steps {
+                echo "🚀 Deploying application using Docker Compose"
                 sh '''
-                  docker compose down
-                  docker compose up -d
+                  # Stop existing compose stack (safe even if not running)
+                  docker compose down --remove-orphans || true
+
+                  # HARD CLEAN: remove any leftover manual containers
+                  docker ps -aq --filter "name=bingo-" | xargs -r docker rm -f
+
+                  # Deploy fresh containers
+                  docker compose up -d --build
                 '''
             }
         }
@@ -59,10 +71,13 @@ pipeline {
 
     post {
         success {
-            echo "✅ Bingo DevSecOps App Deployed Successfully"
+            echo "✅ SUCCESS: Bingo DevSecOps App deployed successfully"
         }
         failure {
-            echo "❌ Pipeline Failed – Check Jenkins Console Logs"
+            echo "❌ FAILURE: Pipeline failed – check logs"
+        }
+        always {
+            echo "📌 Pipeline execution finished"
         }
     }
 }
